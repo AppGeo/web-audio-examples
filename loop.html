@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Looping</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .label {
+        width: 80px;
+      }
+
+      .filter-slider {
+        width: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Looping</span>
+    </div>
+    <div>
+      <span class="label">Loop</span>
+      <select id="loop-select">
+        <option>future</option>
+        <option>gravity</option>
+        <option>heaven</option>
+        <option>midnight</option>
+        <option>slinky</option>
+      </select>
+    </div>
+    <div>
+      <span class="label">High pass</span> <input type="range" id="hi-filter-slider" class="filter-slider" min="0" max="400" step="1" value="0" />
+      <span id="hi-filter-display" class="label freq-label"></span>
+      <br/>
+      <span class="label">Low pass</span> <input type="range" id="lo-filter-slider" class="filter-slider" min="0" max="400" step="1" value="400" />
+      <span id="lo-filter-display" class="label freq-label"></span>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div>
+      <select id="vis-select">
+        <option value="Frequency">frequency</option>
+        <option value="Spectrogram">spectrogram</option>
+      </select><br/>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="microphone.html">&gt; Microphone</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/audio-helper.js"></script>
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript" src="js/spectrogram-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var visCanvas = document.getElementById('visualizer')
+      var visualizer = new App.FrequencyVisualizer(context, visCanvas);
+
+      var audioHelper = new App.AudioHelper(context);
+      var sourceBuffer, sourceNode, loFilterNode, hiFilterNode, gainNode;
+
+      var loopSelect = document.getElementById('loop-select');
+      loopSelect.addEventListener('change', restart);
+
+      var hiFilterDisplay = document.getElementById('hi-filter-display');
+      var hiFilterSlider = document.getElementById('hi-filter-slider');
+
+      hiFilterSlider.addEventListener('input', function () {
+        updateFilter(hiFilterSlider, hiFilterDisplay, hiFilterNode);
+      });
+
+      var loFilterDisplay = document.getElementById('lo-filter-display');
+      var loFilterSlider = document.getElementById('lo-filter-slider');
+
+      loFilterSlider.addEventListener('input', function () {
+        updateFilter(loFilterSlider, loFilterDisplay, loFilterNode);
+      });
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      var visSelect = document.getElementById('vis-select');
+      visSelect.addEventListener('change', changeVisualizer);
+
+      function changeVisualizer() {
+        if (gainNode) {
+          visualizer.releaseConnection(gainNode);
+        }
+
+        visualizer.stop();
+        visualizer = new App[visSelect.value + "Visualizer"](context, visCanvas);
+
+        if (gainNode) {
+          visualizer.acceptConnection(gainNode);
+        }
+      }
+
+      function getFrequency(slider) {
+        return Math.min(Math.round((Math.pow(2, slider.value / 40)) * 20), 20000);
+      }
+
+      function restart() {
+        if (sourceNode) {
+          stop();
+          setTimeout(start, 1100)
+        }
+      }
+
+      function start() {
+        if (!sourceNode) {
+          audioHelper.loadBuffer('audio/loop/' + loopSelect.value + '.ogg', function (buffer) {
+            sourceBuffer = buffer;
+
+            sourceNode = context.createBufferSource();
+            sourceNode.buffer = sourceBuffer;
+            sourceNode.loop = true;
+
+            hiFilterNode = context.createBiquadFilter();
+            hiFilterNode.frequency.value = getFrequency(hiFilterSlider);
+            hiFilterNode.type = 'highpass';
+
+            loFilterNode = context.createBiquadFilter();
+            loFilterNode.frequency.value = getFrequency(loFilterSlider);
+            loFilterNode.type = 'lowpass';
+
+            gainNode = context.createGain();
+            gainNode.gain.value = 0;
+
+            sourceNode.connect(hiFilterNode);
+            hiFilterNode.connect(loFilterNode);
+            loFilterNode.connect(gainNode);
+            gainNode.connect(context.destination);
+            visualizer.acceptConnection(gainNode);
+
+            sourceNode.start();
+            gainNode.gain.setValueAtTime(0, context.currentTime);
+            gainNode.gain.linearRampToValueAtTime(1, context.currentTime + 1);
+          });
+        }
+      }
+
+      function stop() {
+        if (sourceNode) {
+          gainNode.gain.setValueAtTime(gainNode.gain.value, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 1);
+
+          setTimeout(function () {
+            sourceNode.stop();
+            gainNode.disconnect(context.destination);
+            visualizer.releaseConnection(gainNode);
+            sourceNode = undefined;
+            gainNode = undefined;
+          }, 1040);
+        }
+      }
+
+      function updateFilter(slider, label, filterNode) {
+        var filterFrequency = getFrequency(slider);
+        label.textContent = filterFrequency + ' hz';
+
+        if (filterNode) {
+          filterNode.frequency.value = filterFrequency;
+        }
+      }
+
+      updateFilter(hiFilterSlider, hiFilterDisplay);
+      updateFilter(loFilterSlider, loFilterDisplay);
+    })();
+
+  </script>
+</html>

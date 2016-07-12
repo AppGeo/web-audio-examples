@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Button Click</title>
+    <link href="css/audio.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div>
+      Button Click
+    </div>
+    <div>
+      <input type="button" id="clickButton" value="click" />
+    </div>
+    <div class="nav">
+      <a href="loop.html">&gt; Looping</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/audio-helper.js"></script>
+  <script type="text/javascript">
+
+    // two separate audio files
+
+    (function () {
+      var context = new AudioContext();
+      var audioHelper = new App.AudioHelper(context);
+      var downBuffer, upBuffer;
+
+      audioHelper.loadBuffer('audio/button/button-down.ogg', function (buffer) {
+        downBuffer = buffer;
+      });
+
+
+      audioHelper.loadBuffer('audio/button/button-up.ogg', function (buffer) {
+        upBuffer = buffer;
+      });
+
+      var button = document.querySelector('#clickButton');
+      button.addEventListener('mousedown', function () { playBuffer(downBuffer); });
+      button.addEventListener('mouseup', function () { playBuffer(upBuffer); });
+
+      function playBuffer(buffer) {
+        var source = context.createBufferSource();
+        source.buffer = buffer;
+        source.onended = function() {
+          source.disconnect();
+        };
+
+        source.connect(context.destination);
+        source.start();
+      }
+    })();
+
+    // single file containing audio sprites
+
+    // (function () {
+    //   var context = new AudioContext();
+    //   var audioHelper = new App.AudioHelper(context);
+    //   var buttonBuffer;
+    //
+    //   audioHelper.loadBuffer('audio/button/button-sprites.ogg', function (buffer) {
+    //     buttonBuffer = buffer;
+    //   });
+    //
+    //   var button = document.querySelector('#clickButton');
+    //   button.addEventListener('mousedown', function () { playBuffer(buttonBuffer, 0, 0.15); });
+    //   button.addEventListener('mouseup', function () { playBuffer(buttonBuffer, 0.2, 0.15); });
+    //
+    //   function playBuffer(buffer, offset, duration) {
+    //     var source = context.createBufferSource();
+    //     source.buffer = buffer;
+    //     source.onended = function() {
+    //       source.disconnect();
+    //     };
+    //
+    //     source.connect(context.destination);
+    //     source.start(0, offset, duration);
+    //   }
+    // })();
+
+  </script>
+</html>

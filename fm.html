@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Vibrato and FM Synthesis</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .label {
+        width: 80px;
+      }
+
+      .slider {
+        width: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Vibrato and FM Synthesis</span>
+    </div>
+    <div>
+      <span class="label">Wave</span>
+      <select id="wave-select">
+        <option>sine</option>
+        <option>square</option>
+        <option>triangle</option>
+        <option>sawtooth</option>
+      </select>
+    </div>
+
+    <div>
+      <span class="label">Frequency</span>
+      <input type="range" id="freq-slider" class="slider" min="0" max="400" step="1" value="160" />
+      <span id="freq-display" class="label freq-label"></span>
+      <br/>
+      <span class="label">Modulator</span>
+      <input type="range" id="mod-freq-slider" class="slider" min="0" max="400" step="1" value="0" />
+      <span id="mod-freq-display" class="label freq-label"></span>&nbsp;&nbsp;
+      <span class="label"><input type="checkbox" id="lock-check" /> lock</span>
+      <br/>
+      <span class="label">Depth</span>
+      <input type="range" id="mod-depth-slider" class="slider" min="0" max="50" step="0.125" value="0" />
+      <span id="mod-depth-display" class="label">0%</span>
+      <!--<input type="range" id="mod-depth-slider" class="slider" min="0" max="100" step="0.25" value="0" />
+      <span id="mod-depth-display" class="label">0%</span> -->
+      <br/>
+    </div>
+    <div>
+      <span class="label">High pass</span> <input type="range" id="hi-filter-slider" class="slider" min="0" max="400" step="1" value="0" />
+      <span id="hi-filter-display" class="label freq-label"></span>
+      <br/>
+      <span class="label">Low pass</span> <input type="range" id="lo-filter-slider" class="slider" min="0" max="400" step="1" value="400" />
+      <span id="lo-filter-display" class="label freq-label"></span>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="noise.html">&gt; Noise</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var visualizer = new App.FrequencyVisualizer(context, document.getElementById('visualizer'));
+
+      var oscNode, gainNode, loFilterNode, hiFilterNode, modOscNode, modGainNode;
+      var frequency, modFrequency, lockRatio = 0;
+
+      var waveSelect = document.getElementById('wave-select');
+      waveSelect.addEventListener('change', restart);
+
+      var freqDisplay = document.getElementById('freq-display');
+      var freqSlider = document.getElementById('freq-slider');
+      freqSlider.addEventListener('input', updateFrequency);
+
+      var modFreqDisplay = document.getElementById('mod-freq-display');
+      var modFreqSlider = document.getElementById('mod-freq-slider');
+      modFreqSlider.addEventListener('input', function () {
+        updateModulator();
+        setLockRatio()
+      });
+
+      var lockCheck = document.getElementById('lock-check');
+      lockCheck.addEventListener('click', setLockRatio);
+
+      var modDepthDisplay = document.getElementById('mod-depth-display');
+      var modDepthSlider = document.getElementById('mod-depth-slider');
+      modDepthSlider.addEventListener('input', updateDepth);
+
+      var hiFilterDisplay = document.getElementById('hi-filter-display');
+      var hiFilterSlider = document.getElementById('hi-filter-slider');
+
+      hiFilterSlider.addEventListener('input', function () {
+        updateFilter(hiFilterSlider, hiFilterDisplay, hiFilterNode);
+      });
+
+      var loFilterDisplay = document.getElementById('lo-filter-display');
+      var loFilterSlider = document.getElementById('lo-filter-slider');
+
+      loFilterSlider.addEventListener('input', function () {
+        updateFilter(loFilterSlider, loFilterDisplay, loFilterNode);
+      });
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      function getFrequency(slider) {
+        return Math.min(Math.round((Math.pow(2, slider.value / 40)) * 20), 20000);
+      }
+
+      function start() {
+        if (!oscNode) {
+          oscNode = context.createOscillator();
+          oscNode.frequency.value = frequency;
+          oscNode.type = waveSelect.value;
+
+          modOscNode = context.createOscillator();
+          modOscNode.frequency.value = parseFloat(modFreqSlider.value);
+
+          modGainNode = context.createGain();
+          modGainNode.gain.value = frequency * parseFloat(modDepthSlider.value) * 0.01
+          //modGainNode.gain.value = parseFloat(modDepthSlider.value) * 12
+
+          hiFilterNode = context.createBiquadFilter();
+          hiFilterNode.frequency.value = getFrequency(hiFilterSlider);
+          hiFilterNode.type = 'highpass';
+
+          loFilterNode = context.createBiquadFilter();
+          loFilterNode.frequency.value = getFrequency(loFilterSlider);
+          loFilterNode.type = 'lowpass';
+
+          gainNode = context.createGain();
+          gainNode.gain.value = 0;
+
+          modOscNode.connect(modGainNode);
+          modGainNode.connect(oscNode.frequency);
+          //modGainNode.connect(oscNode.detune);
+          oscNode.connect(hiFilterNode);
+          hiFilterNode.connect(loFilterNode);
+          loFilterNode.connect(gainNode);
+          gainNode.connect(context.destination);
+
+          modOscNode.start();
+          oscNode.start();
+          gainNode.gain.setValueAtTime(0, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(1, context.currentTime + 0.01);
+          visualizer.acceptConnection(gainNode);
+        }
+      }
+
+      function stop() {
+        if (oscNode) {
+          gainNode.gain.setValueAtTime(gainNode.gain.value, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.01);
+
+          setTimeout(function () {
+            modOscNode.stop();
+            oscNode.stop();
+            gainNode.disconnect(context.destination);
+            visualizer.releaseConnection(gainNode);
+            modOscNode = undefined;
+            modGainNode = undefined;
+            oscNode = undefined;
+            loFilterNode = undefined;
+            hiFilterNode = undefined;
+            gainNode = undefined;
+          }, 40);
+        }
+      }
+
+      function restart() {
+        if (oscNode) {
+          stop();
+          setTimeout(start, 100)
+        }
+      }
+
+      function setLockRatio() {
+        lockRatio = lockCheck.checked || frequency > 0 ? parseFloat(modFreqSlider.value) / frequency : 0;
+      }
+
+      function updateFilter(slider, label, filterNode) {
+        var filterFrequency = getFrequency(slider);
+        label.textContent = filterFrequency + ' hz';
+
+        if (filterNode) {
+          filterNode.frequency.value = filterFrequency;
+        }
+      }
+
+      function updateDepth() {
+        var modDepth = parseFloat(modDepthSlider.value);
+        modDepthDisplay.textContent = Math.round(modDepth) + '%';
+
+        if (modGainNode) {
+          modGainNode.gain.value = frequency * modDepth * 0.01;
+        }
+      }
+
+      function updateFrequency() {
+        frequency = getFrequency(freqSlider);
+        freqDisplay.textContent = frequency + ' hz';
+
+        if (oscNode) {
+          oscNode.frequency.value = frequency;
+          modGainNode.gain.value = frequency * parseFloat(modDepthSlider.value) * 0.01;
+        }
+
+        if (lockCheck.checked) {
+          modFrequency = frequency * lockRatio;
+          modFreqDisplay.textContent = Math.round(modFrequency) + ' hz';
+          modFreqSlider.value = Math.round(modFrequency);
+
+          if (modOscNode) {
+            modOscNode.frequency.value = modFrequency;
+          }
+        }
+      }
+
+      function updateModulator() {
+        modFrequency = parseFloat(modFreqSlider.value);
+        modFreqDisplay.textContent = modFrequency + ' hz';
+
+        setLockRatio();
+
+        if (modOscNode) {
+          modOscNode.frequency.value = modFrequency;
+        }
+      }
+
+      updateFrequency();
+      updateModulator();
+      updateDepth();
+      updateFilter(hiFilterSlider, hiFilterDisplay);
+      updateFilter(loFilterSlider, loFilterDisplay);
+    })();
+
+  </script>
+</html>

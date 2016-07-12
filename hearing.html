@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Hearing Test</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      #freq-slider {
+        width: 400px;
+      }
+
+      #mode-select {
+        vertical-align: super;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Hearing Test</span>
+    </div>
+    <div>
+      <input type="range" id="freq-slider" min="0" max="400" step="1" value="8" />
+      <span id="freq-display" class="label freq-label"></span>&nbsp;&nbsp;
+      <select id="mode-select">
+        <option>linear</option>
+        <option>logarithmic</option>
+      </select>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div class="nav">
+      <a href="additive.html">&gt; Additive Synthesis</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var oscNode, gainNode, frequency;
+
+      var freqDisplay = document.getElementById('freq-display');
+      var modeSelect = document.getElementById('mode-select');
+      var freqSlider = document.getElementById('freq-slider');
+
+      modeSelect.addEventListener('change', updateFrequency);
+      freqSlider.addEventListener('input', updateFrequency);
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      function start() {
+        if (!oscNode) {
+          oscNode = context.createOscillator();
+          oscNode.frequency.value = frequency;
+
+          gainNode = context.createGain();
+          gainNode.gain.value = 0;
+
+          oscNode.connect(gainNode);
+          gainNode.connect(context.destination);
+          oscNode.start();
+          gainNode.gain.setValueAtTime(0, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(1, context.currentTime + 0.01);
+        }
+      }
+
+      function stop() {
+        if (oscNode) {
+          gainNode.gain.setValueAtTime(gainNode.gain.value, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.01);
+
+          setTimeout(function () {
+            oscNode.stop();
+            gainNode.disconnect();
+            oscNode = undefined;
+            gainNode = undefined;
+          }, 40);
+        }
+      }
+
+      function updateFrequency() {
+        var mode = modeSelect.value;
+
+        if (mode === 'linear') {
+          frequency = Math.max(20, freqSlider.value * 50);
+        }
+        else {
+          frequency = Math.min(Math.round((Math.pow(2, freqSlider.value / 40)) * 20), 20000);
+        }
+
+        freqDisplay.textContent = frequency + ' hz';
+
+        if (oscNode) {
+          oscNode.frequency.value = frequency;
+        }
+      }
+
+      updateFrequency();
+    })();
+
+  </script>
+</html>

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Keyboard</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .label {
+        width: 80px;
+      }
+
+      #keyboard {
+        height: 200px;
+      }
+
+      .key-set {
+        position: absolute;
+        margin: 0;
+        width: 2000px;
+        height: 200px;
+        pointer-events: none;
+      }
+
+      .key {
+        pointer-events: fill;
+      }
+
+      .white {
+        margin: 0;
+        width: 40px;
+        height: 100%;
+        float: left;
+        background-color: #F8F8F0;
+        border-top: solid 1px gray;
+        border-right: solid 1px gray;
+        border-bottom: solid 1px gray;
+      }
+
+      .white:first-child {
+        border-left: solid 1px gray;
+      }
+
+      .white.pressed {
+        background-color: #E0E0E0;
+      }
+
+      .black {
+        margin: 0;
+        margin-right: 20px;
+        width: 21px;
+        height: 60%;
+        background-color: #404040;
+        float: left;
+      }
+
+      .black:first-child {
+        margin-left: 31px;
+      }
+
+      .black.pressed {
+        background-color: #606060;
+      }
+
+      .black.skip {
+        margin-right: 61px;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Keyboard</span>
+    </div>
+    <div>
+      <span class="label">Wave</span>
+      <select id="wave-select">
+        <option>sine</option>
+        <option>square</option>
+        <option>triangle</option>
+        <option>sawtooth</option>
+      </select>
+    </div>
+    <div id="keyboard">
+      <div class="key-set">
+        <div class="key white" key="60"></div>
+        <div class="key white" key="62"></div>
+        <div class="key white" key="64"></div>
+        <div class="key white" key="65"></div>
+        <div class="key white" key="67"></div>
+        <div class="key white" key="69"></div>
+        <div class="key white" key="71"></div>
+        <div class="key white" key="72"></div>
+        <div class="key white" key="74"></div>
+        <div class="key white" key="76"></div>
+        <div class="key white" key="77"></div>
+        <div class="key white" key="79"></div>
+        <div class="key white" key="81"></div>
+        <div class="key white" key="83"></div>
+        <div class="key white" key="84"></div>
+        <div class="key white" key="86"></div>
+        <div class="key white" key="88"></div>
+        <div class="key white" key="89"></div>
+        <div class="key white" key="91"></div>
+        <div class="key white" key="93"></div>
+        <div class="key white" key="95"></div>
+        <div class="key white" key="96"></div>
+      </div>
+      <div class="key-set">
+        <div class="key black" key="61"></div>
+        <div class="key black skip" key="63"></div>
+        <div class="key black" key="66"></div>
+        <div class="key black" key="68"></div>
+        <div class="key black skip" key="70"></div>
+        <div class="key black" key="73"></div>
+        <div class="key black skip" key="75"></div>
+        <div class="key black" key="78"></div>
+        <div class="key black" key="80"></div>
+        <div class="key black skip" key="82"></div>
+        <div class="key black" key="85"></div>
+        <div class="key black skip" key="87"></div>
+        <div class="key black" key="90"></div>
+        <div class="key black" key="92"></div>
+        <div class="key black" key="94"></div>
+      </div>
+    </div>
+    <div>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="fm.html">&gt; Vibrato and FM Synthesis</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var visualizer = new App.FrequencyVisualizer(context, document.getElementById('visualizer'));
+
+      var masterGainNode = context.createGain();
+      masterGainNode.gain.value = 0.5;
+      masterGainNode.connect(context.destination);
+      visualizer.acceptConnection(masterGainNode);
+
+      var voice = [];
+
+      var waveSelect = document.getElementById('wave-select');
+
+      Array.prototype.forEach.call(document.querySelectorAll('.key'), function(keyDiv) {
+        keyDiv.addEventListener('mousedown', function (e) {
+          e.target.classList.add('pressed');
+          start(parseInt(e.target.getAttribute('key'), 10));
+        });
+        keyDiv.addEventListener('mouseup', function (e) {
+          e.target.classList.remove('pressed');
+          stop(parseInt(e.target.getAttribute('key'), 10));
+        });
+      });
+
+      function midiKeyToFrequency(key) {
+        return Math.pow(2, (key - 69) / 12) * 440;
+      }
+
+      function start(key) {
+        if (!voice[key]) {
+          var oscNode = context.createOscillator();
+          oscNode.frequency.value = midiKeyToFrequency(key);
+          oscNode.type = waveSelect.value;
+
+          var loFilterNode = context.createBiquadFilter();
+          loFilterNode.frequency.value = 20000;
+          loFilterNode.type = 'lowpass';
+
+          var gainNode = context.createGain();
+          gainNode.gain.value = 0;
+
+          oscNode.connect(loFilterNode);
+          loFilterNode.connect(gainNode);
+          gainNode.connect(masterGainNode);
+          oscNode.start();
+
+          var t = context.currentTime;
+
+          gainNode.gain.setValueAtTime(0, t + 0.01);
+          gainNode.gain.linearRampToValueAtTime(1, t + 0.02);
+          gainNode.gain.setTargetAtTime(0.33, t + 0.02, 0.1);
+
+          loFilterNode.frequency.setValueAtTime(20000, t + 0.02);
+          loFilterNode.frequency.setTargetAtTime(oscNode.frequency.value, t + 0.02, 0.1);
+
+          voice[key] = {
+            oscNode: oscNode,
+            loFilterNode: loFilterNode,
+            gainNode: gainNode
+          }
+        }
+      }
+
+      function stop(key) {
+        if (voice[key]) {
+          voice[key].gainNode.gain.setValueAtTime(voice[key].gainNode.gain.value, context.currentTime + 0.01);
+          voice[key].gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.02);
+
+          setTimeout(function () {
+            voice[key].oscNode.stop();
+            voice[key].gainNode.disconnect();
+            voice[key] = undefined;
+          }, 200);
+        }
+      }
+    })();
+
+  </script>
+</html>

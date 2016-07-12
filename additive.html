@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Additive Synthesis</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .slider {
+        width: 200px;
+      }
+
+      .left-label {
+        width: 100px;
+      }
+
+      .level-label {
+        width: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Additive Synthesis</span>
+    </div>
+    <div>
+      <span class="label left-label">Frequency</span>
+      <input type="range" id="freq-slider" class="slider" min="20" max="2020" step="10" value="440" />
+      <br/>
+      <span class="label left-label">Fundamental</span>
+      <input type="range" id="level-slider-1" class="slider" h="1" min="0" max="1" step="0.005" value="0.5" />
+      <span id="level-display-1" class="label level-label"></span>
+      <span id="freq-display-1" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 2</span>
+      <input type="range" id="level-slider-2" class="slider" h="2" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-2" class="label level-label"></span>
+      <span id="freq-display-2" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 3</span>
+      <input type="range" id="level-slider-3" class="slider" h="3" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-3" class="label level-label"></span>
+      <span id="freq-display-3" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 4</span>
+      <input type="range" id="level-slider-4" class="slider" h="4" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-4" class="label level-label"></span>
+      <span id="freq-display-4" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 5</span>
+      <input type="range" id="level-slider-5" class="slider" h="5" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-5" class="label level-label"></span>
+      <span id="freq-display-5" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 6</span>
+      <input type="range" id="level-slider-6" class="slider" h="6" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-6" class="label level-label"></span>
+      <span id="freq-display-6" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 7</span>
+      <input type="range" id="level-slider-7" class="slider" h="7" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-7" class="label level-label"></span>
+      <span id="freq-display-7" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 8</span>
+      <input type="range" id="level-slider-8" class="slider" h="8" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-8" class="label level-label"></span>
+      <span id="freq-display-8" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 9</span>
+      <input type="range" id="level-slider-9" class="slider" h="9" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-9" class="label level-label"></span>
+      <span id="freq-display-9" class="label freq-label"></span>
+      <br/>
+      <span class="label left-label">Harmonic 10</span>
+      <input type="range" id="level-slider-10" class="slider" h="10" min="0" max="1" step="0.005" value="0" />
+      <span id="level-display-10" class="label level-label"></span>
+      <span id="freq-display-10" class="label freq-label"></span>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="subtractive.html">&gt; Subtractive Synthesis</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var visualizer = new App.FrequencyVisualizer(context, document.getElementById('visualizer'));
+
+      var oscNode, gainNode, mainGainNode;
+      var levelSlider = [];
+      var levelDisplay = [];
+      var freqDisplay = [];
+      var harmonicsCount = 10;
+
+      var freqSlider = document.getElementById('freq-slider');
+      freqSlider.addEventListener('input', updateFrequency);
+
+      for (var i = 0; i < harmonicsCount; i++) {
+        levelDisplay[i] = document.getElementById('level-display-' + (i + 1));
+        freqDisplay[i] = document.getElementById('freq-display-' + (i + 1));
+        levelSlider[i] = document.getElementById('level-slider-' + (i + 1));
+        levelSlider[i].addEventListener('input', updateGain);
+      }
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      function start() {
+        if (!oscNode) {
+          var frequency = parseFloat(freqSlider.value);
+          oscNode = [];
+          gainNode = [];
+
+          mainGainNode = context.createGain();
+          mainGainNode.gain.value = 1;
+          mainGainNode.connect(context.destination);
+          visualizer.acceptConnection(mainGainNode);
+
+          for (var i = 0; i < harmonicsCount; i++) {
+            oscNode[i] = context.createOscillator();
+            oscNode[i].frequency.value = frequency * (i + 1);
+
+            gainNode[i] = context.createGain();
+            gainNode[i].gain.value = 0;
+
+            oscNode[i].connect(gainNode[i]);
+            gainNode[i].connect(mainGainNode);
+            oscNode[i].start();
+          }
+
+          updateGain();
+        }
+      }
+
+      function stop() {
+        if (oscNode) {
+          for (var i = 0; i < harmonicsCount; i++) {
+            gainNode[i].gain.setValueAtTime(gainNode[i].gain.value, context.currentTime);
+            gainNode[i].gain.linearRampToValueAtTime(0, context.currentTime + 0.01);
+          }
+
+          setTimeout(function () {
+            for (var i = 0; i < harmonicsCount; i++) {
+              oscNode[i].stop();
+              gainNode[i].disconnect();
+            }
+
+            mainGainNode.disconnect(context.destination)
+            visualizer.releaseConnection(context.destination);
+
+            oscNode = undefined;
+            gainNode = undefined;
+            mainGainNode = undefined;
+          }, 100);
+        }
+      }
+
+      function updateGain() {
+        var totalGain = 0;
+        var maxGain = 0;
+
+        for (var i = 0; i < harmonicsCount; i++) {
+          var gain = parseFloat(levelSlider[i].value);
+          levelDisplay[i].textContent = gain.toFixed(2);
+          totalGain += gain;
+          maxGain = Math.max(gain, maxGain);
+        }
+
+        var gainFactor = totalGain > 0 ? maxGain / totalGain : 0;
+
+        if (gainNode) {
+          for (var i = 0; i < harmonicsCount; i++) {
+            gainNode[i].gain.setValueAtTime(gainNode[i].gain.value, context.currentTime);
+            gainNode[i].gain.linearRampToValueAtTime(parseFloat(levelSlider[i].value) * gainFactor, context.currentTime + 0.01);
+          }
+        }
+      }
+
+      function updateFrequency() {
+        for (var i = 0; i < harmonicsCount; i++) {
+          var frequency = parseFloat(freqSlider.value) * (i + 1);
+          freqDisplay[i].textContent = frequency + ' hz';
+
+          if (oscNode) {
+            oscNode[i].frequency.value = frequency;
+          }
+        }
+      }
+
+      updateFrequency();
+      updateGain();
+    })();
+
+  </script>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Subtractive Synthesis</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .label {
+        width: 80px;
+      }
+
+      .slider {
+        width: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Subtractive Synthesis</span>
+    </div>
+    <div>
+      <span class="label">Wave</span>
+      <select id="wave-select">
+        <option>sine</option>
+        <option>square</option>
+        <option>triangle</option>
+        <option>sawtooth</option>
+      </select>
+    </div>
+
+    <div>
+      <span class="label">Frequency</span>
+      <input type="range" id="freq-slider" class="slider" min="0" max="400" step="1" value="160" />
+      <span id="freq-display" class="label"></span>
+      <br/>
+      <span class="label">High pass</span> <input type="range" id="hi-filter-slider" class="slider" min="0" max="400" step="1" value="0" />
+      <span id="hi-filter-display" class="label"></span>
+      <br/>
+      <span class="label">Low pass</span> <input type="range" id="lo-filter-slider" class="slider" min="0" max="400" step="1" value="400" />
+      <span id="lo-filter-display" class="label"></span>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="envelope.html">&gt; Envelope</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var visualizer = new App.FrequencyVisualizer(context, document.getElementById('visualizer'));
+
+      var oscNode, gainNode, frequency, loFilterNode, hiFilterNode;
+
+      var freqDisplay = document.getElementById('freq-display');
+      var freqSlider = document.getElementById('freq-slider');
+      freqSlider.addEventListener('input', updateFrequency);
+
+      var waveSelect = document.getElementById('wave-select');
+      waveSelect.addEventListener('change', restart);
+
+      var hiFilterDisplay = document.getElementById('hi-filter-display');
+      var hiFilterSlider = document.getElementById('hi-filter-slider');
+
+      hiFilterSlider.addEventListener('input', function () {
+        updateFilter(hiFilterSlider, hiFilterDisplay, hiFilterNode);
+      });
+
+      var loFilterDisplay = document.getElementById('lo-filter-display');
+      var loFilterSlider = document.getElementById('lo-filter-slider');
+
+      loFilterSlider.addEventListener('input', function () {
+        updateFilter(loFilterSlider, loFilterDisplay, loFilterNode);
+      });
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      function getFrequency(slider) {
+        return Math.min(Math.round((Math.pow(2, slider.value / 40)) * 20), 20000);
+      }
+
+      function restart() {
+        if (oscNode) {
+          stop();
+          setTimeout(start, 100)
+        }
+      }
+
+      function start() {
+        if (!oscNode) {
+          oscNode = context.createOscillator();
+          oscNode.frequency.value = frequency;
+          oscNode.type = waveSelect.value;
+
+          loFilterNode = context.createBiquadFilter();
+          loFilterNode.frequency.value = getFrequency(loFilterSlider);
+          loFilterNode.type = 'lowpass';
+
+          hiFilterNode = context.createBiquadFilter();
+          hiFilterNode.frequency.value = getFrequency(hiFilterSlider);
+          hiFilterNode.type = 'highpass';
+
+          gainNode = context.createGain();
+          gainNode.gain.value = 0;
+
+          oscNode.connect(loFilterNode);
+          loFilterNode.connect(hiFilterNode);
+          hiFilterNode.connect(gainNode);
+          gainNode.connect(context.destination);
+          visualizer.acceptConnection(gainNode);
+          oscNode.start();
+
+          gainNode.gain.setValueAtTime(0, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(1, context.currentTime + 0.02);
+        }
+      }
+
+      function stop() {
+        if (oscNode) {
+          gainNode.gain.setValueAtTime(gainNode.gain.value, context.currentTime);
+          gainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.02);
+
+          setTimeout(function () {
+            oscNode.stop();
+            gainNode.disconnect(context.destination);
+            visualizer.releaseConnection(gainNode);
+            oscNode = undefined;
+            loFilterNode = undefined;
+            hiFilterNode = undefined;
+            gainNode = undefined;
+          }, 40);
+        }
+      }
+
+      function updateFilter(slider, label, filterNode) {
+        var filterFrequency = getFrequency(slider);
+        label.textContent = filterFrequency + ' hz';
+
+        if (filterNode) {
+          filterNode.frequency.value = filterFrequency;
+        }
+      }
+
+      function updateFrequency() {
+        frequency = getFrequency(freqSlider);
+        freqDisplay.textContent = frequency + ' hz';
+
+        if (oscNode) {
+          oscNode.frequency.value = frequency;
+        }
+      }
+
+      updateFrequency();
+      updateFilter(hiFilterSlider, hiFilterDisplay);
+      updateFilter(loFilterSlider, loFilterDisplay);
+    })();
+
+  </script>
+</html>

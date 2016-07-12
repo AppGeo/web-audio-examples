@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Noise</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .label {
+        width: 80px;
+      }
+
+      .filter-slider {
+        width: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Noise</span>
+    </div>
+    <div>
+      <span class="label">Type</span>
+      <select id="type-select">
+        <option>white</option>
+        <option>pink</option>
+        <option>brown</option>
+      </select>
+    </div>
+    <div>
+      <span class="label">High pass</span> <input type="range" id="hi-filter-slider" class="filter-slider" min="0" max="400" step="1" value="0" />
+      <span id="hi-filter-display" class="label freq-label"></span>
+      <br/>
+      <span class="label">Low pass</span> <input type="range" id="lo-filter-slider" class="filter-slider" min="0" max="400" step="1" value="400" />
+      <span id="lo-filter-display" class="label freq-label"></span>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="button.html">&gt; Button Click</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/audio-helper.js"></script>
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+      var context = new AudioContext();
+      var visualizer = new App.FrequencyVisualizer(context, document.getElementById('visualizer'));
+
+      var randomLeft, randomRight;
+      var scriptNode, loFilterNode, hiFilterNode, gainNode;
+
+      var typeSelect = document.getElementById('type-select');
+      typeSelect.addEventListener('change', selectType);
+
+      var hiFilterDisplay = document.getElementById('hi-filter-display');
+      var hiFilterSlider = document.getElementById('hi-filter-slider');
+
+      hiFilterSlider.addEventListener('input', function () {
+        updateFilter(hiFilterSlider, hiFilterDisplay, hiFilterNode);
+      });
+
+      var loFilterDisplay = document.getElementById('lo-filter-display');
+      var loFilterSlider = document.getElementById('lo-filter-slider');
+
+      loFilterSlider.addEventListener('input', function () {
+        updateFilter(loFilterSlider, loFilterDisplay, loFilterNode);
+      });
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      function createRandomBrown() {
+        var n = 0;
+
+        return function () {
+          var white = randomWhite();
+          var output = (n + (0.02 * white)) / 1.02;
+          n = output;
+          return output *= 3.5;
+        };
+      }
+
+      function createRandomPink(dbPerPole, dbOffset) {
+        var coeff = [];
+        var gain = [];
+        var state = [];
+
+        var twoPI = Math.PI * 2;
+        var freq = (context.sampleRate / twoPI) - 1;
+
+        var db = 0;
+        var sumGain = 0;
+        var i = 0;
+
+        while (freq > 1) {
+          state[i] = 0;
+          coeff[i] = twoPI * freq / context.sampleRate;
+          freq /= 4;
+          i++;
+        }
+
+        while (i-- > 0) {
+          gain[i] = dbToGain(db);
+          sumGain += gain[i];
+          db += dbPerPole;
+        }
+
+        var gainAdjust = dbToGain(-gainToDb(sumGain) + dbOffset);
+
+        return function () {
+          var white = randomWhite();
+          var pink = 0;
+          i = 0;
+
+          while (++i < coeff.length) {
+            state[i] = coeff[i] * white + (1 - coeff[i]) * state[i];
+            pink += state[i] * gain[i];
+          }
+
+          return pink * gainAdjust * 10;
+        }
+      }
+
+      function dbToGain(db) {
+        return Math.pow(10, db / 20);
+      }
+
+      function gainToDb(g) {
+        return Math.log(g) * 20 / Math.log(10);
+      }
+
+      function getFrequency(slider) {
+        return Math.min(Math.round((Math.pow(2, slider.value / 40)) * 20), 20000);
+      }
+
+      function randomWhite() {
+        return Math.random() * 2 - 1;
+      }
+
+      function selectType() {
+        var restart = scriptNode && true;
+
+        if (restart) {
+          stop();
+        }
+
+        switch (typeSelect.value) {
+          case 'white':
+            randomLeft = randomWhite;
+            randomRight = randomWhite;
+            break;
+
+          case 'pink':
+            randomLeft = createRandomPink(-6, 0);
+            randomRight = createRandomPink(-6, 0);
+            break;
+
+          case 'brown':
+            randomLeft = createRandomPink(-12, 9);
+            randomRight = createRandomPink(-12, 9);
+            break;
+        }
+
+        if (restart) {
+          start();
+        }
+      }
+
+      function start() {
+        if (!scriptNode) {
+          scriptNode = context.createScriptProcessor(4096, 0, 2);
+          scriptNode.onaudioprocess = function (e) {
+            var left = e.outputBuffer.getChannelData(0);
+            var right = e.outputBuffer.getChannelData(1);
+
+            for (var i = 0; i < left.length; i++) {
+              left[i] = randomLeft();
+              right[i] = randomRight();
+            }
+          };
+
+          hiFilterNode = context.createBiquadFilter();
+          hiFilterNode.frequency.value = getFrequency(hiFilterSlider);
+          hiFilterNode.type = 'highpass';
+
+          loFilterNode = context.createBiquadFilter();
+          loFilterNode.frequency.value = getFrequency(loFilterSlider);
+          loFilterNode.type = 'lowpass';
+
+          gainNode = context.createGain();
+          gainNode.gain.value = 1;
+
+          scriptNode.connect(hiFilterNode);
+          hiFilterNode.connect(loFilterNode);
+          loFilterNode.connect(gainNode);
+          gainNode.connect(context.destination);
+          visualizer.acceptConnection(gainNode);
+        }
+      }
+
+      function stop() {
+        if (scriptNode) {
+          gainNode.disconnect(context.destination);
+          visualizer.releaseConnection(gainNode);
+          scriptNode = undefined;
+          gainNode = undefined;
+        }
+      }
+
+      function updateFilter(slider, label, filterNode) {
+        var filterFrequency = getFrequency(slider);
+        label.textContent = filterFrequency + ' hz';
+
+        if (filterNode) {
+          filterNode.frequency.value = filterFrequency;
+        }
+      }
+
+      selectType();
+      updateFilter(hiFilterSlider, hiFilterDisplay);
+      updateFilter(loFilterSlider, loFilterDisplay);
+    })();
+
+  </script>
+</html>
