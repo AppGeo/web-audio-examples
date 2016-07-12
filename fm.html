@@ -42,8 +42,6 @@
       <span class="label">Depth</span>
       <input type="range" id="mod-depth-slider" class="slider" min="0" max="50" step="0.125" value="0" />
       <span id="mod-depth-display" class="label">0%</span>
-      <!--<input type="range" id="mod-depth-slider" class="slider" min="0" max="100" step="0.25" value="0" />
-      <span id="mod-depth-display" class="label">0%</span> -->
       <br/>
     </div>
     <div>
@@ -129,7 +127,6 @@
 
           modGainNode = context.createGain();
           modGainNode.gain.value = frequency * parseFloat(modDepthSlider.value) * 0.01
-          //modGainNode.gain.value = parseFloat(modDepthSlider.value) * 12
 
           hiFilterNode = context.createBiquadFilter();
           hiFilterNode.frequency.value = getFrequency(hiFilterSlider);
@@ -144,7 +141,6 @@
 
           modOscNode.connect(modGainNode);
           modGainNode.connect(oscNode.frequency);
-          //modGainNode.connect(oscNode.detune);
           oscNode.connect(hiFilterNode);
           hiFilterNode.connect(loFilterNode);
           loFilterNode.connect(gainNode);

@@ -33,10 +33,6 @@
   _AudioParam_ of another _AudioNode_, causing its value to vary over
   time.
 
-### frequency-visualizer.js
-* Turns a canvas element into an animated frequency bar visualization
-  when connected to an _AudioNode_.
-
 ### hearing.html
 * A simple hearing test. Generates a sine wave with a frequency
   that can be set between 20 Hz and 20,000 Hz, the range of human
@@ -69,10 +65,6 @@
   * Brown - Favors lower frequencies even more strongly than pink
     noise.
 * Demonstrates the use of _ScriptProcessorNode_.
-
-### spectrogram-visualizer.js
-* Turns a canvas element into an moving spectrogram when connected to
-  an _AudioNode_.
 
 ### subtractive.html
 * Subtractive Synthesis, in which the output from an oscillator with
