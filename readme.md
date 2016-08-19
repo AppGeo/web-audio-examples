@@ -33,6 +33,14 @@
   _AudioParam_ of another _AudioNode_, causing its value to vary over
   time.
 
+### formant.html
+* Emulates a male singing a set of vowel sounds.
+* Demonstrates how a set of bandpass filters can model the human vocal
+  tract.
+* Vowel formants are defined as parallel arrays of frequencies, Q-values
+  (which define the width of bandpass) and amplitudes.
+* A slider smoothly transitions from one vowel to the next.
+
 ### hearing.html
 * A simple hearing test. Generates a sine wave with a frequency
   that can be set between 20 Hz and 20,000 Hz, the range of human

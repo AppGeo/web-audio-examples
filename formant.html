@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Vowel Formants</title>
+    <link href="css/audio.css" rel="stylesheet" />
+    <style>
+      .label {
+        width: 80px;
+      }
+
+      .slider {
+        width: 400px;
+      }
+
+      #vowel-ipa-display {
+        width: 60px;
+      }
+
+      #vowel-ex-display {
+        width: 120px;
+      }
+
+      .hi {
+        color: white;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <span class="title">Vowel Formants</span>
+    </div>
+
+    <div>
+      <span class="label">Vowel</span>
+      <input type="range" id="vowel-slider" class="slider" min="0" max="11" step="0.0275" value="0" />
+      <span id="vowel-ipa-display" class="label"></span><span id="vowel-ex-display" class="label"></span>
+      <br/>
+      <span class="label">Frequency</span>
+      <input type="range" id="freq-slider" class="slider" min="0" max="400" step="1" value="80" />
+      <span id="freq-display" class="label"></span>
+      <br/>
+      <span class="label">Modulator</span>
+      <input type="range" id="mod-freq-slider" class="slider" min="0" max="10" step="0.025" value="6" />
+      <span id="mod-freq-display" class="label"></span>
+      <br/>
+      <span class="label">Depth</span>
+      <input type="range" id="mod-depth-slider" class="slider" min="0" max="8" step="0.02" value="2" />
+      <span id="mod-depth-display" class="label">0%</span>
+    </div>
+    <div>
+      <input type="button" id="start" value="start" />
+      <input type="button" id="stop" value="stop" />
+    </div>
+    <div>
+      <canvas id="visualizer" width="1024" height="300"></canvas>
+    </div>
+    <div class="nav">
+      <a href="noise.html">&gt; Noise</a><br/>
+      <a href="index.html">&gt; Index</a>
+    </div>
+  </body>
+
+  <script type="text/javascript" src="js/frequency-visualizer.js"></script>
+  <script type="text/javascript">
+
+    (function () {
+
+      // Sources
+      //    Formant frequencies: Hillenbrand, Getty, Clark and Wheeler (1994), "Acoustic charcteristics of
+      //        American English Vowels", Journal of the Acoustic Society of America; Table V
+      //    Formant amplitudes: Peterson and Barney (1952), "Control Methods User in a Study of the Vowels",
+      //        Journal of the Acoustic Society of America; Table II; dB converted to gain with
+      //        Math.pow(10, dB / 20)
+
+      var vowel = [
+        {
+          ipa: 'i',
+          ex: 'b<span class="hi">ea</span>t',
+          f: [138, 342, 2322, 3000, 3657],
+          q: [8, 10, 35, 40, 40],
+          a: [0.63, 0.63, 0.06, 0.04, 0.04]
+        },
+        {
+          ipa: 'ɪ',
+          ex: 'b<span class="hi">i</span>t',
+          f: [135, 427, 2034, 2684, 3618],
+          q: [8, 10, 35, 40, 40],
+          a: [0.71, 0.71, 0.07, 0.04, 0.04]
+        },
+        {
+          ipa: 'e',
+          ex: 'b<span class="hi">a</span>it',
+          f: [129, 476, 2089, 2691, 3649],
+          q: [8, 10, 35, 40, 40],
+          a: [0.79, 0.79, 0.10, 0.06, 0.06]
+        },
+        {
+          ipa: 'ɛ',
+          ex: 'b<span class="hi">e</span>t',
+          f: [127, 580, 1799, 2605, 3677],
+          q: [8, 10, 35, 40, 40],
+          a: [0.79, 0.79, 0.14, 0.06, 0.06]
+        },
+        {
+          ipa: 'æ',
+          ex: 'b<span class="hi">a</span>t',
+          f: [123, 588, 1952, 2601, 3624],
+          q: [8, 10, 35, 40, 40],
+          a: [0.89, 0.89, 0.25, 0.08, 0.08]
+        },
+        {
+          ipa: 'ɑ',
+          ex: 'p<span class="hi">a</span>r',
+          f: [123, 768, 1333, 2522, 3687],
+          q: [8, 10, 35, 40, 40],
+          a: [0.89, 0.89, 0.56, 0.04, 0.04]
+        },
+        {
+          ipa: 'ɔ',
+          ex: 'b<span class="hi">o</span>t',
+          f: [121, 652, 997, 2538, 3486],
+          q: [8, 10, 35, 40, 40],
+          a: [1, 1, 0.45, 0.02, 0.02]
+        },
+        {
+          ipa: 'o',
+          ex: 'b<span class="hi">o</span>at',
+          f: [129, 497, 910, 2459, 3384],
+          q: [8, 10, 35, 40, 40],
+          a: [0.89, 0.89, 0.32, 0.02, 0.02]
+        },
+        {
+          ipa: 'u',
+          ex: 'b<span class="hi">oo</span>t',
+          f: [143, 378, 997, 2343, 3357],
+          q: [8, 10, 35, 40, 40],
+          a: [0.71, 0.71, 0.11, 0.01, 0.01]
+        },
+        {
+          ipa: 'ʊ',
+          ex: 'p<span class="hi">u</span>t',
+          f: [133, 469, 1122, 2434, 3400],
+          q: [8, 10, 35, 40, 40],
+          a: [0.89, 0.89, 0.25, 0.02, 0.02]
+        },
+        {
+          ipa: 'ʌ',
+          ex: 'b<span class="hi">u</span>t',
+          f: [133, 623, 1200, 2550, 3557],
+          q: [8, 10, 35, 40, 40],
+          a: [0.89, 0.89, 0.32, 0.04, 0.04]
+        },
+        {
+          ipa: 'ɚ',
+          ex: 'b<span class="hi">ir</span>d',
+          f: [130, 474, 1379, 1710, 3334],
+          q: [8, 10, 35, 40, 40],
+          a: [0.56, 0.56, 0.18, 0.10, 0.10]
+        }
+      ];
+
+      var context = new AudioContext();
+      var visualizer = new App.FrequencyVisualizer(context, document.getElementById('visualizer'));
+
+      var oscNode, masterGainNode, masterFilterNode, modOscNode, modGainNode, filterNodes = [], gainNodes = [];
+      var formant, frequency, modFrequency, modDepth;
+
+      var vowelIpaDisplay = document.getElementById('vowel-ipa-display');
+      var vowelExDisplay = document.getElementById('vowel-ex-display');
+      var vowelSlider = document.getElementById('vowel-slider');
+      vowelSlider.addEventListener('input', updateVowel);
+
+      var freqDisplay = document.getElementById('freq-display');
+      var freqSlider = document.getElementById('freq-slider');
+      freqSlider.addEventListener('input', updateFrequency);
+
+      var modFreqDisplay = document.getElementById('mod-freq-display');
+      var modFreqSlider = document.getElementById('mod-freq-slider');
+      modFreqSlider.addEventListener('input', updateModulator);
+
+      var modDepthDisplay = document.getElementById('mod-depth-display');
+      var modDepthSlider = document.getElementById('mod-depth-slider');
+      modDepthSlider.addEventListener('input', updateDepth);
+
+      document.getElementById('start').addEventListener('click', start);
+      document.getElementById('stop').addEventListener('click', stop);
+
+      function getFrequency(slider) {
+        return Math.min(Math.round((Math.pow(2, slider.value / 40)) * 20), 20000);
+      }
+
+      function getIntermediate(prop, idx) {
+        var i = Math.floor(vowelSlider.value);
+        var d = vowelSlider.value - i;
+        var dx = (vowel[i + 1][prop][idx] - vowel[i][prop][idx]) * d;
+        return vowel[i][prop][idx] + dx;
+      }
+
+      function start() {
+        if (!oscNode) {
+          oscNode = context.createOscillator();
+          oscNode.frequency.value = frequency;
+          oscNode.type = 'sawtooth';
+          //oscNode.setPeriodicWave(periodicWave);
+
+          modOscNode = context.createOscillator();
+          modOscNode.frequency.value = parseFloat(modFreqSlider.value);
+
+          modGainNode = context.createGain();
+          modGainNode.gain.value = frequency * parseFloat(modDepthSlider.value) * 0.01
+
+          modOscNode.connect(modGainNode);
+          modGainNode.connect(oscNode.frequency);
+
+          masterFilterNode = context.createBiquadFilter();
+          masterFilterNode.frequency.value = 5000;
+          masterFilterNode.type = 'lowpass';
+          oscNode.connect(masterFilterNode);
+
+          masterGainNode = context.createGain();
+          masterGainNode.gain.value = 0;
+
+          for (var i = 0; i <= 4; i++) {
+            filterNodes[i] = context.createBiquadFilter();
+            filterNodes[i].type = 'bandpass';
+            masterFilterNode.connect(filterNodes[i]);
+
+            gainNodes[i] = context.createGain();
+            filterNodes[i].connect(gainNodes[i]);
+
+            gainNodes[i].connect(masterGainNode);
+          }
+
+          updateVowel();
+
+          masterGainNode.connect(context.destination);
+          visualizer.acceptConnection(masterGainNode);
+          oscNode.start();
+          modOscNode.start();
+
+          masterGainNode.gain.setValueAtTime(0, context.currentTime);
+          masterGainNode.gain.linearRampToValueAtTime(0.5, context.currentTime + 0.02);
+        }
+      }
+
+      function stop() {
+        if (oscNode) {
+          masterGainNode.gain.setValueAtTime(masterGainNode.gain.value, context.currentTime);
+          masterGainNode.gain.linearRampToValueAtTime(0, context.currentTime + 0.02);
+
+          setTimeout(function () {
+            oscNode.stop();
+            masterGainNode.disconnect(context.destination);
+            visualizer.releaseConnection(masterGainNode);
+            oscNode = undefined;
+            modOscNode = undefined;
+            modGainNode = undefined;
+            masterFilterNode = undefined;
+            filterNodes = [];
+            gainNodes = [];
+            masterGainNode = undefined;
+          }, 40);
+        }
+      }
+
+      function updateDepth() {
+        var modDepth = parseFloat(modDepthSlider.value);
+        modDepthDisplay.textContent = Math.round(modDepth) + '%';
+
+        if (modGainNode) {
+          modGainNode.gain.value = frequency * modDepth * 0.01;
+        }
+      }
+
+      function updateFrequency() {
+        frequency = getFrequency(freqSlider);
+        freqDisplay.textContent = frequency + ' hz';
+
+        if (oscNode) {
+          oscNode.frequency.value = frequency;
+        }
+      }
+
+      function updateModulator() {
+        modFrequency = parseFloat(modFreqSlider.value);
+        modFreqDisplay.textContent = Math.round(modFrequency) + ' hz';
+
+        if (modOscNode) {
+          modOscNode.frequency.value = modFrequency;
+        }
+      }
+
+      function updateVowel() {
+        var v = vowel[Math.round(vowelSlider.value)];
+        vowelIpaDisplay.textContent = 'IPA: ' + v.ipa;
+        vowelExDisplay.innerHTML = 'Example: ' + v.ex;
+
+        if (filterNodes.length) {
+          for (var i = 0; i <= 4; i++) {
+            filterNodes[i].frequency.value = getIntermediate('f', i);
+            filterNodes[i].Q.value = getIntermediate('q', i);
+            gainNodes[i].gain.value = getIntermediate('a', i);
+          }
+        }
+      }
+
+      updateVowel();
+      updateFrequency();
+      updateModulator();
+      updateDepth();
+    })();
+
+  </script>
+</html>
